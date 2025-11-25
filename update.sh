@@ -1,48 +1,111 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
 # Use the directory where the script is located
-CURRENT_DIR="$(pwd)"  # or use "${BASH_SOURCE[0]%/*}" for the directory containing the script
+CURRENT_DIR=$(dirname "${BASH_SOURCE[0]}")
+cd "$CURRENT_DIR" || exit 1
 
-EXCLUDED_FILE="$CURRENT_DIR/exclude.conf"
-BASE_DIR="$CURRENT_DIR"
+EXCLUDED_FILE="exclude.conf"
+UPSTREAM_FILE="upstream"
+BASE_DIR="."
 
-# Remove all .txt files in the current directory
-rm "$BASE_DIR"/*.txt
-
-# Use the URL from "upstream" to download files
-cat "$BASE_DIR/upstream" | xargs -n 1 -P 10 wget -q
-
-# Check if exclude.conf exists
-if [[ ! -f "$EXCLUDED_FILE" ]]; then
-    echo "Error: exclude.conf does not exist."
+# Check prerequisites
+if [[ ! -f "$UPSTREAM_FILE" ]]; then
+    echo "Error: $UPSTREAM_FILE not found."
     exit 1
 fi
 
-current_file=""
+echo "Starting update process..."
 
-# Read each line in exclude.conf
-while IFS= read -r line
-do
-    # Check if the line is a file indicator
-    if [[ $line =~ ^\[(.*)\]$ ]]; then
-        current_file="${BASH_REMATCH[1]}"
-        continue
-    fi
+# Create a temporary directory for downloads
+DOWNLOAD_DIR=$(mktemp -d)
+echo "Downloading files to temporary directory: $DOWNLOAD_DIR"
 
-    # If we have a current file and the line is not empty
-    if [[ -n "$current_file" && -n "$line" ]]; then
-        target_file="$BASE_DIR/$current_file"
+# Download files in parallel
+# Using xargs with wget. -P 10 for parallel downloads.
+if grep -v '^\s*$' "$UPSTREAM_FILE" | xargs -n 1 -P 10 wget -q -P "$DOWNLOAD_DIR"; then
+    echo "Download successful."
+else
+    echo "Error: Download failed. Aborting."
+    rm -rf "$DOWNLOAD_DIR"
+    exit 1
+fi
+
+# Move downloaded files to current directory, overwriting existing ones
+echo "Updating local files..."
+cp "$DOWNLOAD_DIR"/* "$BASE_DIR/"
+rm -rf "$DOWNLOAD_DIR"
+
+# Process exclusions
+if [[ -f "$EXCLUDED_FILE" ]]; then
+    echo "Processing exclusions from $EXCLUDED_FILE..."
+    
+    current_target=""
+    declare -a patterns
+    
+    # Read exclude.conf
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Trim whitespace
+        line=$(echo "$line" | xargs)
         
-        # Check if the target file exists
-        if [[ -f "$target_file" ]]; then
-            # Use sed to delete lines containing the current keyword
-            sed -i '' "/$line/d" "$target_file"
-            echo "Deleted lines containing '$line' from $current_file"
+        if [[ -z "$line" ]]; then continue; fi
+        
+        if [[ "$line" =~ ^\[(.*)\]$ ]]; then
+            # Process previous section
+            if [[ -n "$current_target" && ${#patterns[@]} -gt 0 ]]; then
+                target_file="$BASE_DIR/$current_target"
+                if [[ -f "$target_file" ]]; then
+                     echo "  Applying ${#patterns[@]} exclusions to $current_target..."
+                     # Create sed script
+                     sed_script=$(mktemp)
+                     for p in "${patterns[@]}"; do
+                         echo "/$p/d" >> "$sed_script"
+                     done
+                     
+                     if [[ "$OSTYPE" == "darwin"* ]]; then
+                        sed -i '' -f "$sed_script" "$target_file"
+                     else
+                        sed -i -f "$sed_script" "$target_file"
+                     fi
+                     rm "$sed_script"
+                else
+                    echo "  Warning: $target_file does not exist. Skipping..."
+                fi
+            fi
+            
+            # Start new section
+            current_target="${BASH_REMATCH[1]}"
+            patterns=()
         else
-            echo "Warning: $current_file does not exist. Skipping..."
+            patterns+=("$line")
+        fi
+    done < "$EXCLUDED_FILE"
+    
+    # Process the last section
+    if [[ -n "$current_target" && ${#patterns[@]} -gt 0 ]]; then
+        target_file="$BASE_DIR/$current_target"
+        if [[ -f "$target_file" ]]; then
+             echo "  Applying ${#patterns[@]} exclusions to $current_target..."
+             sed_script=$(mktemp)
+             for p in "${patterns[@]}"; do
+                 echo "/$p/d" >> "$sed_script"
+             done
+             
+             if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' -f "$sed_script" "$target_file"
+             else
+                sed -i -f "$sed_script" "$target_file"
+             fi
+             rm "$sed_script"
+        else
+             echo "  Warning: $target_file does not exist. Skipping..."
         fi
     fi
-done < "$EXCLUDED_FILE"
+else
+    echo "Warning: $EXCLUDED_FILE not found."
+fi
 
 
 update_apple_cn() {
@@ -51,6 +114,11 @@ update_apple_cn() {
     local appletv_url="https://raw.githubusercontent.com/v2fly/domain-list-community/refs/heads/master/data/apple-tvplus"
     local rules_file="$BASE_DIR/apple_rules.tmp"
     local config_file="$BASE_DIR/thezion-direct.conf"
+
+    if [[ ! -f "$config_file" ]]; then
+        echo "Warning: $config_file not found. Skipping Apple@cn update."
+        return
+    fi
 
     # Fetch and process both Apple CN and Apple TV+ rules
     {
@@ -63,7 +131,7 @@ update_apple_cn() {
             } else {
                 printf "  - DOMAIN-SUFFIX,%s\n", $0;
             }
-        }'
+        }' || echo "Warning: Failed to download/process Apple rules" >&2
 
         # Process Apple TV+ (no @cn filter, strip tags)
         wget -qO- "$appletv_url" | awk '!/^#/ && NF {
@@ -74,7 +142,7 @@ update_apple_cn() {
             } else {
                 printf "  - DOMAIN-SUFFIX,%s\n", $0;
             }
-        }'
+        }' || echo "Warning: Failed to download/process AppleTV+ rules" >&2
     } | sort -u > "$rules_file"
 
     if [[ ! -s "$rules_file" ]]; then
