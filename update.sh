@@ -48,19 +48,34 @@ done < "$EXCLUDED_FILE"
 update_apple_cn() {
     echo "Updating Apple@cn rules..."
     local apple_url="https://raw.githubusercontent.com/v2fly/domain-list-community/refs/heads/master/data/apple"
+    local appletv_url="https://raw.githubusercontent.com/v2fly/domain-list-community/refs/heads/master/data/apple-tvplus"
     local rules_file="$BASE_DIR/apple_rules.tmp"
     local config_file="$BASE_DIR/thezion-direct.conf"
 
-    # Fetch and process
-    wget -qO- "$apple_url" | awk '/@cn$/ {
-        sub(/ @cn$/, "", $0);
-        if ($0 ~ /^full:/) {
-            sub(/^full:/, "", $0);
-            printf "  - DOMAIN,%s\n", $0;
-        } else {
-            printf "  - DOMAIN-SUFFIX,%s\n", $0;
-        }
-    }' | sort -u > "$rules_file"
+    # Fetch and process both Apple CN and Apple TV+ rules
+    {
+        # Process Apple CN (filter for @cn)
+        wget -qO- "$apple_url" | awk '/@cn$/ && !/^#/ {
+            sub(/ @cn$/, "", $0);
+            if ($0 ~ /^full:/) {
+                sub(/^full:/, "", $0);
+                printf "  - DOMAIN,%s\n", $0;
+            } else {
+                printf "  - DOMAIN-SUFFIX,%s\n", $0;
+            }
+        }'
+
+        # Process Apple TV+ (no @cn filter, strip tags)
+        wget -qO- "$appletv_url" | awk '!/^#/ && NF {
+            sub(/ @.*$/, "", $0);
+            if ($0 ~ /^full:/) {
+                sub(/^full:/, "", $0);
+                printf "  - DOMAIN,%s\n", $0;
+            } else {
+                printf "  - DOMAIN-SUFFIX,%s\n", $0;
+            }
+        }'
+    } | sort -u > "$rules_file"
 
     if [[ ! -s "$rules_file" ]]; then
         echo "Warning: No rules generated for Apple@cn."
