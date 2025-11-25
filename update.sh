@@ -44,4 +44,53 @@ do
     fi
 done < "$EXCLUDED_FILE"
 
+
+update_apple_cn() {
+    echo "Updating Apple@cn rules..."
+    local apple_url="https://raw.githubusercontent.com/v2fly/domain-list-community/refs/heads/master/data/apple"
+    local rules_file="$BASE_DIR/apple_rules.tmp"
+    local config_file="$BASE_DIR/thezion-direct.conf"
+
+    # Fetch and process
+    wget -qO- "$apple_url" | awk '/@cn$/ {
+        sub(/ @cn$/, "", $0);
+        if ($0 ~ /^full:/) {
+            sub(/^full:/, "", $0);
+            printf "  - DOMAIN,%s\n", $0;
+        } else {
+            printf "  - DOMAIN-SUFFIX,%s\n", $0;
+        }
+    }' | sort -u > "$rules_file"
+
+    if [[ ! -s "$rules_file" ]]; then
+        echo "Warning: No rules generated for Apple@cn."
+        rm -f "$rules_file"
+        return
+    fi
+
+    # Update config file using perl for robust multiline handling
+    perl -i -e '
+        open(F, "'"$rules_file"'") or die $!;
+        @rules = <F>;
+        close(F);
+        while (<>) {
+            if (/^# Apple\@cn$/) {
+                print;
+                print @rules;
+                $skip = 1;
+                next;
+            }
+            if ($skip && /^# /) {
+                $skip = 0;
+            }
+            print unless $skip;
+        }
+    ' "$config_file"
+
+    rm -f "$rules_file"
+    echo "Apple@cn rules updated."
+}
+
+update_apple_cn
+
 echo "Processing complete."
