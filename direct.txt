@@ -9,7 +9,6 @@ payload:
   - 'afcs.dell.com'
   - 'ai.zhaomi.cn'
   - 'alibaba.cdn.steampipe.steamcontent.com'
-  - 'app-analytics-services.com'
   - 'app-measurement-cn.com'
   - 'appldnld.g.aaplimg.com'
   - 'apps5.oingo.com'
