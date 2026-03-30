@@ -19,9 +19,10 @@ fi
 
 echo "Starting update process..."
 
-# Create a temporary directory for downloads
+# Create a temporary directory for downloads; clean it up on exit (success or error)
 DOWNLOAD_DIR=$(mktemp -d)
 echo "Downloading files to temporary directory: $DOWNLOAD_DIR"
+trap 'echo "Cleaning up $DOWNLOAD_DIR..."; rm -rf "$DOWNLOAD_DIR"' EXIT
 
 # Download files in parallel
 # Using xargs with wget. -P 10 for parallel downloads.
@@ -29,29 +30,27 @@ if grep -v '^\s*$' "$UPSTREAM_FILE" | xargs -n 1 -P 10 wget -q -P "$DOWNLOAD_DIR
     echo "Download successful."
 else
     echo "Error: Download failed. Aborting."
-    rm -rf "$DOWNLOAD_DIR"
     exit 1
 fi
 
 # Move downloaded files to current directory, overwriting existing ones
 echo "Updating local files..."
 cp "$DOWNLOAD_DIR"/* "$BASE_DIR/"
-rm -rf "$DOWNLOAD_DIR"
 
 # Process exclusions
 if [[ -f "$EXCLUDED_FILE" ]]; then
     echo "Processing exclusions from $EXCLUDED_FILE..."
-    
+
     current_target=""
     declare -a patterns
-    
+
     # Read exclude.conf
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Trim whitespace
         line=$(echo "$line" | xargs)
-        
+
         if [[ -z "$line" ]]; then continue; fi
-        
+
         if [[ "$line" =~ ^\[(.*)\]$ ]]; then
             # Process previous section
             if [[ -n "$current_target" && ${#patterns[@]} -gt 0 ]]; then
@@ -63,7 +62,7 @@ if [[ -f "$EXCLUDED_FILE" ]]; then
                      for p in "${patterns[@]}"; do
                          echo "/$p/d" >> "$sed_script"
                      done
-                     
+
                      if [[ "$OSTYPE" == "darwin"* ]]; then
                         sed -i '' -f "$sed_script" "$target_file"
                      else
@@ -74,7 +73,7 @@ if [[ -f "$EXCLUDED_FILE" ]]; then
                     echo "  Warning: $target_file does not exist. Skipping..."
                 fi
             fi
-            
+
             # Start new section
             current_target="${BASH_REMATCH[1]}"
             patterns=()
@@ -82,7 +81,7 @@ if [[ -f "$EXCLUDED_FILE" ]]; then
             patterns+=("$line")
         fi
     done < "$EXCLUDED_FILE"
-    
+
     # Process the last section
     if [[ -n "$current_target" && ${#patterns[@]} -gt 0 ]]; then
         target_file="$BASE_DIR/$current_target"
@@ -92,7 +91,7 @@ if [[ -f "$EXCLUDED_FILE" ]]; then
              for p in "${patterns[@]}"; do
                  echo "/$p/d" >> "$sed_script"
              done
-             
+
              if [[ "$OSTYPE" == "darwin"* ]]; then
                 sed -i '' -f "$sed_script" "$target_file"
              else
@@ -106,6 +105,7 @@ if [[ -f "$EXCLUDED_FILE" ]]; then
 else
     echo "Warning: $EXCLUDED_FILE not found."
 fi
+
 
 
 update_apple_cn() {
@@ -174,11 +174,13 @@ update_apple_cn() {
     echo "Apple@cn rules updated."
 }
 
+
 update_asn_extract() {
     echo "Updating ASN Extract rules..."
     local config_file="$BASE_DIR/thezion-direct.conf"
     local python_bin="$CURRENT_DIR/.venv/bin/python3"
     local extract_script="$CURRENT_DIR/extract_asn.py"
+    local db_path="$DOWNLOAD_DIR/GeoLite2-ASN.mmdb"  # lives in the shared tmp dir
     local rules_file
     rules_file=$(mktemp)
 
@@ -194,13 +196,13 @@ update_asn_extract() {
         return
     fi
 
-    # Run extractor (--refresh forces re-download of DB), format as YAML list items
-    "$python_bin" "$extract_script" --refresh 2>&1 1>"$rules_file" | while IFS= read -r line; do
+    # Download DB (--refresh) into the shared tmp dir; stream progress to console
+    "$python_bin" "$extract_script" --refresh --db-path "$db_path" 2>&1 1>/dev/null | while IFS= read -r line; do
         echo "  [asn] $line"
     done
 
-    # Re-run to get stdout cleanly formatted
-    "$python_bin" "$extract_script" 2>/dev/null \
+    # Now extract CIDRs (DB already present, no re-download) and format as YAML list items
+    "$python_bin" "$extract_script" --db-path "$db_path" 2>/dev/null \
         | awk '{printf "  - %s\n", $0}' > "$rules_file"
 
     if [[ ! -s "$rules_file" ]]; then
@@ -236,6 +238,7 @@ update_asn_extract() {
     rm -f "$rules_file"
     echo "ASN Extract rules updated."
 }
+
 
 update_apple_cn
 update_asn_extract
