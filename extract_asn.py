@@ -12,6 +12,7 @@ _DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Geo
 # ─── Configure ASNs to extract ───────────────────────────────────────────────
 TARGET_ASNS = {
     132203,
+    139341,
     55990,
     45102,
     25820,
