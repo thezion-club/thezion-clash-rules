@@ -174,6 +174,70 @@ update_apple_cn() {
     echo "Apple@cn rules updated."
 }
 
+update_asn_extract() {
+    echo "Updating ASN Extract rules..."
+    local config_file="$BASE_DIR/thezion-direct.conf"
+    local python_bin="$CURRENT_DIR/.venv/bin/python3"
+    local extract_script="$CURRENT_DIR/extract_asn.py"
+    local rules_file
+    rules_file=$(mktemp)
+
+    if [[ ! -f "$config_file" ]]; then
+        echo "Warning: $config_file not found. Skipping ASN Extract update."
+        rm -f "$rules_file"
+        return
+    fi
+
+    if [[ ! -f "$python_bin" ]]; then
+        echo "Warning: .venv/bin/python3 not found. Run: python3 -m venv .venv && .venv/bin/pip install maxminddb"
+        rm -f "$rules_file"
+        return
+    fi
+
+    # Run extractor (--refresh forces re-download of DB), format as YAML list items
+    "$python_bin" "$extract_script" --refresh 2>&1 1>"$rules_file" | while IFS= read -r line; do
+        echo "  [asn] $line"
+    done
+
+    # Re-run to get stdout cleanly formatted
+    "$python_bin" "$extract_script" 2>/dev/null \
+        | awk '{printf "  - %s\n", $0}' > "$rules_file"
+
+    if [[ ! -s "$rules_file" ]]; then
+        echo "Warning: No ASN CIDRs generated. Skipping."
+        rm -f "$rules_file"
+        return
+    fi
+
+    local count
+    count=$(wc -l < "$rules_file" | xargs)
+    echo "  Inserting $count CIDR entries under '# ASN Extract'..."
+
+    # Replace everything between '# ASN Extract' and the next '# ' section (or EOF)
+    perl -i -e '
+        open(F, "'"$rules_file"'") or die "Cannot open rules: $!";
+        @rules = <F>;
+        close(F);
+        $skip = 0;
+        while (<>) {
+            if (/^# ASN Extract$/) {
+                print;
+                print @rules;
+                $skip = 1;
+                next;
+            }
+            if ($skip && /^# /) {
+                $skip = 0;
+            }
+            print unless $skip;
+        }
+    ' "$config_file"
+
+    rm -f "$rules_file"
+    echo "ASN Extract rules updated."
+}
+
 update_apple_cn
+update_asn_extract
 
 echo "Processing complete."
