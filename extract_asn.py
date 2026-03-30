@@ -21,8 +21,8 @@ TARGET_ASNS = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--refresh", action="store_true", help="Force re-download of the DB")
-    parser.add_argument("--db-path", default=_DEFAULT_DB_PATH, help="Path to store/read GeoLite2-ASN.mmdb")
+    parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--db-path", default=_DEFAULT_DB_PATH)
     args = parser.parse_args()
 
     db_path = args.db_path
@@ -33,14 +33,19 @@ def main():
         print("Download complete.", file=sys.stderr)
 
     print(f"Extracting CIDRs for ASNs: {TARGET_ASNS} ...", file=sys.stderr)
+
     results = []
+    append = results.append  # avoid repeated attribute lookup in hot loop
+    target = TARGET_ASNS     # local binding is faster than global lookup
+
     with maxminddb.open_database(db_path, maxminddb.MODE_MMAP) as reader:
         for network, data in reader:
-            if data and data.get("autonomous_system_number") in TARGET_ASNS:
-                results.append(str(network))
+            if data and data["autonomous_system_number"] in target:
+                append(str(network))
 
-    for cidr in sorted(results):
-        print(cidr)  # stdout only — consumed by caller
+    sys.stdout.write("\n".join(sorted(results)))
+    if results:
+        sys.stdout.write("\n")
 
     print(f"Total: {len(results)} prefixes.", file=sys.stderr)
 

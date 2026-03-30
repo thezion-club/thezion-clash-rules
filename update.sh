@@ -196,14 +196,15 @@ update_asn_extract() {
         return
     fi
 
-    # Download DB (--refresh) into the shared tmp dir; stream progress to console
-    "$python_bin" "$extract_script" --refresh --db-path "$db_path" 2>&1 1>/dev/null | while IFS= read -r line; do
-        echo "  [asn] $line"
-    done
-
-    # Now extract CIDRs (DB already present, no re-download) and format as YAML list items
-    "$python_bin" "$extract_script" --db-path "$db_path" 2>/dev/null \
-        | awk '{printf "  - %s\n", $0}' > "$rules_file"
+    # Single run: download DB if needed and extract CIDRs
+    "$python_bin" "$extract_script" --refresh --db-path "$db_path" 2>&1 \
+        | while IFS= read -r line; do
+            if [[ "$line" =~ ^[0-9] ]]; then
+                printf "  - %s\n" "$line"
+            else
+                echo "  [asn] $line" >&2
+            fi
+        done > "$rules_file"
 
     if [[ ! -s "$rules_file" ]]; then
         echo "Warning: No ASN CIDRs generated. Skipping."
