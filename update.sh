@@ -220,6 +220,7 @@ update_asn_extract() {
         open(F, "'"$rules_file"'") or die "Cannot open rules: $!";
         @rules = <F>;
         close(F);
+        chomp $rules[-1];
         $skip = 0;
         while (<>) {
             if (/^# ASN Extract$/) {
