@@ -197,14 +197,9 @@ update_asn_extract() {
     fi
 
     # Single run: download DB if needed and extract CIDRs
-    "$python_bin" "$extract_script" --refresh --db-path "$db_path" 2>&1 \
-        | while IFS= read -r line; do
-            if [[ "$line" =~ ^[0-9] ]]; then
-                printf "  - %s\n" "$line"
-            else
-                echo "  [asn] $line" >&2
-            fi
-        done > "$rules_file"
+    "$python_bin" "$extract_script" --refresh --db-path "$db_path" 2> >(
+        while IFS= read -r line; do echo "  [asn] $line"; done >&2
+    ) | awk 'NF {printf "  - %s\n", $0}' > "$rules_file"
 
     if [[ ! -s "$rules_file" ]]; then
         echo "Warning: No ASN CIDRs generated. Skipping."

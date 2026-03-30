@@ -41,7 +41,8 @@ def main():
     with maxminddb.open_database(db_path, maxminddb.MODE_MMAP) as reader:
         for network, data in reader:
             if data and data["autonomous_system_number"] in target:
-                append(str(network))
+                prefix = "IP-CIDR6" if network.version == 6 else "IP-CIDR"
+                append(f"{prefix},{network}")
 
     sys.stdout.write("\n".join(sorted(results)))
     if results:
