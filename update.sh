@@ -236,8 +236,35 @@ update_asn_extract() {
     echo "ASN Extract rules updated."
 }
 
+convert_to_mrs() {
+    echo "Converting rule-sets to .mrs format..."
+
+    # 文件名含 "cidr" 的为 ipcidr 行为，其余为 domain 行为
+    for txt_file in "$BASE_DIR"/*.txt; do
+        [[ -f "$txt_file" ]] || continue
+
+        filename=$(basename "$txt_file")
+        mrs_file="${txt_file%.txt}.mrs"
+
+        if [[ "$filename" == *cidr* ]]; then
+            behavior="ipcidr"
+        else
+            behavior="domain"
+        fi
+
+        echo "  Converting $filename ($behavior) -> $(basename "$mrs_file")..."
+        if mihomo convert-ruleset "$behavior" yaml "$txt_file" "$mrs_file"; then
+            echo "  ✓ $(basename "$mrs_file") done."
+        else
+            echo "  ✗ Failed to convert $filename. Skipping."
+        fi
+    done
+
+    echo "All .mrs conversions complete."
+}
 
 update_apple_cn
 update_asn_extract
+convert_to_mrs
 
 echo "Processing complete."
