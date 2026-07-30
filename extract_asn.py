@@ -1,5 +1,4 @@
 import urllib.request
-import maxminddb
 import os
 import sys
 import argparse
@@ -32,8 +31,16 @@ def main():
 
     if not os.path.exists(db_path) or args.refresh:
         print("Downloading ASN database...", file=sys.stderr)
-        urllib.request.urlretrieve(DB_URL, db_path)
+        try:
+            urllib.request.urlretrieve(DB_URL, db_path)
+        except Exception as e:
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            print(f"Download failed: {e}", file=sys.stderr)
+            sys.exit(1)
         print("Download complete.", file=sys.stderr)
+
+    import maxminddb
 
     print(f"Extracting CIDRs for ASNs: {TARGET_ASNS} ...", file=sys.stderr)
 
