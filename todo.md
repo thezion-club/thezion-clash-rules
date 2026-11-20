@@ -1,5 +1,5 @@
 # Todo (project level)
-Project-level unfinished work. Workflow in GEMINI.md.
+Project-level unfinished work. Workflow in AGENTS.md.
 
 ## Open
 - None.

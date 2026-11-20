@@ -1,4 +1,4 @@
-# GEMINI.md
+# AGENTS.md
 Same file in every project. Project-specific rules go in project.md, not here.
 
 ## Memory files
@@ -26,7 +26,7 @@ Format: `- [ ] <item> – <owner> – since YYYY-MM-DD`
 3. Reset context.md to this template:
 ```
 # Context (short-term memory)
-Current chat only. Reset to this template before each commit (see GEMINI.md).
+Current chat only. Reset to this template before each commit (see AGENTS.md).
 
 ## In progress
 - None.

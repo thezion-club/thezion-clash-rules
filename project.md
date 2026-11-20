@@ -1,6 +1,6 @@
 # Project: thezion-clash-rules
 
-Long-term memory for this project. Memory file rules are in GEMINI.md; do not repeat them here.
+Long-term memory for this project. Memory file rules are in AGENTS.md; do not repeat them here.
 
 ## Purpose
 Clash/mihomo rule-set repository for the zion club, built on top of [Loyalsoldier/clash-rules](https://github.com/Loyalsoldier/clash-rules).
@@ -17,9 +17,9 @@ Rule-sets and configurations are updated by running `bash update.sh` from the re
 ## Folder layout
 ```
 thezion-clash-rules/
-  GEMINI.md                     Shared memory-file rules (same file in every project)
+  AGENTS.md                     Shared memory-file rules (same file in every project)
   project.md                    This file: rules, structure and long-term memory
-  context.md, todo.md           Short-term and project task tracking (see GEMINI.md)
+  context.md, todo.md           Short-term and project task tracking (see AGENTS.md)
   memories/                     Task state and reference data
     task-state.md               Checkpoint of day-to-day task in progress
     task-todo.md                Day-to-day follow-ups from tasks
@@ -38,7 +38,7 @@ thezion-clash-rules/
 ```
 
 ## Memory files
-Reference files in `memories/` for this project (the general memory files are defined in GEMINI.md):
+Reference files in `memories/` for this project (the general memory files are defined in AGENTS.md):
 
 | File | Holds |
 |--|--|

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Blocks a commit while context.md holds work items.
-# context.md is short-term memory and must be reset to its template (see GEMINI.md) before each commit.
+# context.md is short-term memory and must be reset to its template (see AGENTS.md) before each commit.
 if [ -f context.md ] && grep -E '^\s*[-*] ' context.md | grep -vqE '^\s*- None\.\s*$'; then
-  echo "pre-commit: context.md is not reset. Move its items (see GEMINI.md, Before each commit) and reset it to the template." >&2
+  echo "pre-commit: context.md is not reset. Move its items (see AGENTS.md, Before each commit) and reset it to the template." >&2
   exit 1
 fi
 exit 0
